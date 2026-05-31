@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>cdc — Chrome DevTools CLI</title>
+<style>
+/* ── Reset & Base ────────────────────────── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--sans);
+  background: var(--paper);
+  color: var(--slate);
+  line-height: 1.6;
+  transition: background .2s, color .2s;
+}
+
+/* ── Palette ─────────────────────────────── */
+:root {
+  --ivory:    #FAF9F5;
+  --paper:    #FFFFFF;
+  --slate:    #141413;
+  --clay:     #D97757;
+  --clay-d:   #B85C3E;
+  --oat:      #E3DACC;
+  --olive:    #788C5D;
+  --sky:      #6A8CAF;
+  --g100:     #F0EEE6;
+  --g200:     #E6E3DA;
+  --g300:     #D1CFC5;
+  --g500:     #87867F;
+  --g700:     #3D3D3A;
+  --rust:     #B04A3F;
+  --green:    #5B8C5A;
+  --amber:    #C9953C;
+  --serif:    ui-serif, Georgia, "Times New Roman", Times, serif;
+  --sans:     system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono:     ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
+  --accent:   #D97757;
+  --accent-hover: #C0664A;
+}
+
+/* ── System dark mode ────────────────────── */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-dm]) {
+    --ivory:   #1A1A1A;
+    --paper:   #242424;
+    --slate:   #E8E6DC;
+    --clay:    #E8927A;
+    --clay-d:  #F0A088;
+    --oat:     #3D3D3A;
+    --olive:   #8CA87A;
+    --sky:     #8AAED0;
+    --g100:    #2E2E2E;
+    --g200:    #353535;
+    --g300:    #454545;
+    --g500:    #999999;
+    --g700:    #D4D4D4;
+    --rust:    #D97A6A;
+    --green:   #7AB87A;
+    --amber:   #D4A84E;
+    --accent:  #E8927A;
+    --accent-hover: #F0A088;
+  }
+}
+
+/* ── Manual dark override ────────────────── */
+html[data-dm="dark"] {
+  --ivory:   #1A1A1A;
+  --paper:   #242424;
+  --slate:   #E8E6DC;
+  --clay:    #E8927A;
+  --clay-d:  #F0A088;
+  --oat:     #3D3D3A;
+  --olive:   #8CA87A;
+  --sky:     #8AAED0;
+  --g100:    #2E2E2E;
+  --g200:    #353535;
+  --g300:    #454545;
+  --g500:    #999999;
+  --g700:    #D4D4D4;
+  --rust:    #D97A6A;
+  --green:   #7AB87A;
+  --amber:   #D4A84E;
+  --accent:  #E8927A;
+  --accent-hover: #F0A088;
+}
+
+/* ── Manual light override ───────────────── */
+html[data-dm="light"] {
+  /* same as default :root */
+}
+
+/* ── Typography ──────────────────────────── */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--serif);
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--slate);
+}
+h1 { font-size: clamp(2rem, 4vw, 2.8rem); margin-bottom: .5rem; }
+h2 { font-size: clamp(1.4rem, 2.5vw, 1.8rem); margin: 2.5rem 0 .75rem; }
+h3 { font-size: clamp(1.1rem, 2vw, 1.3rem); margin: 1.5rem 0 .5rem; }
+p, li { font-size: clamp(.95rem, 1.2vw, 1.05rem); }
+p { margin-bottom: 1rem; }
+
+a { color: var(--accent); text-decoration: none; border-bottom: 1px solid transparent; transition: border-color .15s; }
+a:hover { border-bottom-color: var(--accent); }
+
+ul, ol { padding-left: 1.5rem; margin-bottom: 1rem; }
+li { margin-bottom: .3rem; }
+
+/* ── Layout ──────────────────────────────── */
+header {
+  background: var(--ivory);
+  border-bottom: 1px solid var(--g200);
+  padding: 3rem 2rem 2rem;
+  text-align: center;
+}
+header .subtitle {
+  color: var(--g500);
+  font-size: 1.1rem;
+  margin-top: .25rem;
+}
+header .badge {
+  display: inline-block;
+  background: var(--clay);
+  color: #fff;
+  font-size: .75rem;
+  font-weight: 600;
+  padding: .2rem .6rem;
+  border-radius: 4px;
+  margin-top: .75rem;
+  letter-spacing: .02em;
+}
+
+.container {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+section { margin: 2.5rem 0; }
+
+footer {
+  margin-top: 4rem;
+  padding: 2rem 1.5rem;
+  border-top: 1px solid var(--g200);
+  text-align: center;
+  color: var(--g500);
+  font-size: .85rem;
+}
+
+/* ── Code blocks (hardcoded dark background) ─ */
+pre {
+  background: #1A1A1A;
+  color: #E8E6DC;
+  font-family: var(--mono);
+  font-size: .8rem;
+  line-height: 1.65;
+  border-radius: 8px;
+  padding: 1rem 1.1rem;
+  overflow-x: auto;
+  margin: .8rem 0 1.2rem;
+}
+pre .cmt { color: #6A8A6A; }
+pre .kw  { color: #C792EA; }
+pre .str { color: #C3E88D; }
+pre .fn  { color: #82AAFF; }
+pre .num { color: #F78C6C; }
+pre .dim { color: #8A8A8A; }
+pre .err { color: #E8837C; }
+pre .fix { color: #7EC87E; }
+pre .del { color: #E8837C; }
+pre .var { color: #FFCB6B; }
+pre .sel { color: #F07178; }
+
+code {
+  font-family: var(--mono);
+  font-size: .85em;
+  background: var(--g100);
+  color: var(--g700);
+  padding: .1em .35em;
+  border-radius: 3px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-dm]) p code,
+  :root:not([data-dm]) li code {
+    background: #2A2A2A;
+    color: #E8E6DC;
+  }
+}
+html[data-dm="dark"] p code,
+html[data-dm="dark"] li code {
+  background: #2A2A2A;
+  color: #E8E6DC;
+}
+html[data-dm="light"] p code,
+html[data-dm="light"] li code {
+  background: #F0EEE6;
+  color: #3D3D3A;
+}
+
+/* ── Command Table ───────────────────────── */
+.cmd-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: .5rem;
+  margin: 1rem 0;
+}
+.cmd-row {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: .5rem;
+  padding: .5rem .75rem;
+  background: var(--g100);
+  border-radius: 6px;
+  align-items: start;
+  transition: background .15s;
+}
+.cmd-row:hover { background: var(--g200); }
+.cmd-row .sig {
+  font-family: var(--mono);
+  font-size: .8rem;
+  color: var(--accent);
+  font-weight: 600;
+  word-break: break-all;
+}
+.cmd-row .desc {
+  font-size: .9rem;
+  color: var(--g700);
+}
+
+/* ── Side-by-side comparison ─────────────── */
+.compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+.compare-col {
+  background: var(--g100);
+  border-radius: 8px;
+  padding: 1rem;
+  border: 1px solid var(--g200);
+}
+.compare-col h4 {
+  font-family: var(--serif);
+  font-size: 1rem;
+  margin-bottom: .5rem;
+  color: var(--slate);
+  border-bottom: 2px solid var(--clay);
+  padding-bottom: .3rem;
+  display: inline-block;
+}
+.compare-col pre { margin: .5rem 0 0; }
+
+/* ── Info boxes ──────────────────────────── */
+.info-box {
+  background: var(--ivory);
+  border-left: 4px solid var(--accent);
+  padding: .8rem 1rem;
+  border-radius: 0 6px 6px 0;
+  margin: 1rem 0;
+}
+.info-box strong { color: var(--accent); }
+
+/* ── Feature cards ───────────────────────── */
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+.feature-card {
+  background: var(--g100);
+  border: 1px solid var(--g200);
+  border-radius: 8px;
+  padding: 1rem;
+  transition: transform .15s, box-shadow .15s;
+}
+.feature-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,.06);
+}
+.feature-card h4 {
+  font-family: var(--serif);
+  font-size: .95rem;
+  margin-bottom: .35rem;
+}
+.feature-card p { font-size: .85rem; color: var(--g500); margin: 0; }
+.feature-card .icon { font-size: 1.3rem; margin-bottom: .3rem; display: block; }
+
+/* ── Interactive code snippet tabs ──────── */
+.tab-bar {
+  display: flex;
+  gap: 0;
+  margin: .8rem 0 0;
+  border-bottom: 1px solid var(--g300);
+}
+.tab-btn {
+  background: var(--g200);
+  border: 1px solid var(--g300);
+  border-bottom: none;
+  padding: .4rem .8rem;
+  font-size: .8rem;
+  font-family: var(--mono);
+  cursor: pointer;
+  color: var(--g500);
+  border-radius: 4px 4px 0 0;
+  transition: background .15s, color .15s;
+}
+.tab-btn.active {
+  background: #1A1A1A;
+  color: #E8E6DC;
+  border-color: #1A1A1A;
+}
+.tab-btn:hover:not(.active) { background: var(--g300); color: var(--slate); }
+.tab-content pre { margin-top: 0; border-radius: 0 8px 8px 8px; }
+.tab-content .tab-pane { display: none; }
+.tab-content .tab-pane.active { display: block; }
+
+/* ── Architecture diagram ────────────────── */
+.arch-flow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: .25rem;
+  padding: 1.5rem 1rem;
+  margin: 1rem 0;
+  background: var(--ivory);
+  border-radius: 10px;
+  border: 1px solid var(--g200);
+}
+.arch-node {
+  background: var(--paper);
+  border: 2px solid var(--g300);
+  border-radius: 8px;
+  padding: .5rem .8rem;
+  font-family: var(--mono);
+  font-size: .75rem;
+  text-align: center;
+  min-width: 80px;
+  transition: border-color .15s, transform .15s;
+}
+.arch-node:hover {
+  border-color: var(--accent);
+  transform: scale(1.04);
+}
+.arch-node .tag {
+  display: block;
+  font-size: .65rem;
+  color: var(--g500);
+  font-family: var(--sans);
+  margin-top: .2rem;
+}
+.arch-arrow {
+  font-size: 1.2rem;
+  color: var(--g300);
+  padding: 0 .15rem;
+}
+
+/* ── Animated CLI typing effect ─────────── */
+.cli-line {
+  display: block;
+  opacity: 0;
+  animation: fadeIn .25s ease forwards;
+}
+@keyframes fadeIn { to { opacity: 1; } }
+
+/* ── Callout for duration tracking ──────── */
+.dur-vis {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  margin: .5rem 0;
+}
+.dur-bar {
+  height: 8px;
+  background: var(--g300);
+  border-radius: 4px;
+  flex: 1;
+  overflow: hidden;
+}
+.dur-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--green), var(--amber), var(--rust));
+  border-radius: 4px;
+  transition: width .3s;
+}
+
+/* ── Dark mode toggle ────────────────────── */
+.dm-toggle {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  border: 1.5px solid var(--g300);
+  background: var(--paper);
+  color: var(--slate);
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  transition: background .2s, transform .15s;
+  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+}
+.dm-toggle:hover { transform: scale(1.08); }
+
+/* ── TOC ─────────────────────────────────── */
+.toc {
+  background: var(--ivory);
+  border: 1px solid var(--g200);
+  border-radius: 8px;
+  padding: 1rem 1.5rem;
+  margin: 2rem 0;
+}
+.toc h3 { margin: 0 0 .5rem; font-family: var(--serif); }
+.toc ul { columns: 2; column-gap: 2rem; margin: 0; }
+.toc li { font-size: .9rem; list-style: none; padding: .15rem 0; break-inside: avoid; }
+.toc li::before { content: "→ "; color: var(--accent); font-family: var(--sans); }
+.toc a { border-bottom: none; }
+
+/* ── Responsive ──────────────────────────── */
+@media (max-width: 640px) {
+  .cmd-row { grid-template-columns: 1fr; }
+  .compare { grid-template-columns: 1fr; }
+  .toc ul { columns: 1; }
+  header { padding: 2rem 1rem 1.5rem; }
+}
+
+/* ── Smooth reveal on scroll ────────────── */
+.reveal {
+  opacity: 0;
+  transform: translateY(15px);
+  transition: opacity .45s ease, transform .45s ease;
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+</style>
+</head>
+<body>
+
+<button class="dm-toggle" id="dmToggle" onclick="toggleDarkMode()" title="Toggle dark/light mode"></button>
+
+<header>
+  <h1>cdc</h1>
+  <div class="subtitle">Chrome DevTools CLI — Project-Agnostic Browser Automation</div>
+  <span class="badge">v1.0.0 &middot; MIT</span>
+</header>
+
+<div class="container">
+
+<!-- ── TOC ──────────────────────────────────── -->
+<div class="toc">
+  <h3>Contents</h3>
+  <ul>
+    <li><a href="#what">What is cdc?</a></li>
+    <li><a href="#install">Installation</a></li>
+    <li><a href="#commands">All Commands</a></li>
+    <li><a href="#layout-modes">Layout Modes</a></li>
+    <li><a href="#fill-engine">Fill Engine</a></li>
+    <li><a href="#interaction">Interaction Commands</a></li>
+    <li><a href="#wait-flag">The <code>--wait</code> Flag</a></li>
+    <li><a href="#duration">Duration Tracking</a></li>
+    <li><a href="#architecture">Architecture</a></li>
+    <li><a href="#how-it-works">How It Works</a></li>
+  </ul>
+</div>
+
+<!-- ── What is cdc? ────────────────────────── -->
+<section id="what">
+  <h2>What is cdc?</h2>
+  <p>
+    <strong>cdc</strong> (Chrome DevTools CLI) is a project-agnostic command-line tool for
+    interacting with Chrome pages and extensions during development. It connects directly to
+    Chrome via the <strong>Chrome DevTools Protocol (CDP)</strong> on port <code>9222</code>,
+    giving you fine-grained control without any project-specific code.
+  </p>
+  <div class="info-box">
+    <strong>Key insight:</strong> cdc uses the Accessibility Tree (via CDP) to understand page
+    structure — no vision model needed. Text models navigate 3× faster when fed structured
+    element tables vs. screenshots.
+  </div>
+  <p>Designed for:</p>
+  <ul>
+    <li><strong>Extension developers</strong> — reload extensions, read errors, toggle dev mode</li>
+    <li><strong>AI agent tooling</strong> — programmatic fill, click, verify via numbered indices</li>
+    <li><strong>Test automation</strong> — bulk form filling, structured layout extraction</li>
+    <li><strong>Performance debugging</strong> — every operation reports its duration in ms</li>
+  </ul>
+</section>
+
+<!-- ── Installation ─────────────────────────── -->
+<section id="install">
+  <h2>Installation</h2>
+  <pre><span class="dim"># Clone and setup</span>
+git clone https://github.com/shivam2014/chrome-cdp-cli.git
+cd chrome-cdp-cli
+npm install
+npm link            <span class="dim"># makes `cdc` available globally</span>
+
+<span class="dim"># Chrome must be running with remote debugging enabled</span>
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+  --remote-debugging-port=9222
+
+<span class="dim"># Verify it works</span>
+cdc status</pre>
+  <p>
+    Alternatively, set the <code>CDC_PORT</code> environment variable to use a
+    different CDP port.
+  </p>
+</section>
+
+<!-- ── All Commands ─────────────────────────── -->
+<section id="commands">
+  <h2>All Commands</h2>
+
+  <h3>Page &amp; Extension Management</h3>
+  <div class="cmd-grid">
+    <div class="cmd-row"><span class="sig">cdc list</span><span class="desc">List all open tabs/pages</span></div>
+    <div class="cmd-row"><span class="sig">cdc status</span><span class="desc">Health check + circuit breaker state</span></div>
+    <div class="cmd-row"><span class="sig">cdc reload-ext &lt;name&gt;</span><span class="desc">Reload extension by name</span></div>
+    <div class="cmd-row"><span class="sig">cdc refresh-page &lt;pattern&gt;</span><span class="desc">Refresh first page matching URL pattern</span></div>
+    <div class="cmd-row"><span class="sig">cdc reload-ext+page &lt;ext&gt; &lt;pattern&gt;</span><span class="desc">Reload ext then refresh page</span></div>
+    <div class="cmd-row"><span class="sig">cdc eval &lt;pattern&gt; &lt;expr&gt;</span><span class="desc">Evaluate JS in matching page</span></div>
+    <div class="cmd-row"><span class="sig">cdc screenshot &lt;pattern&gt; [path]</span><span class="desc">Screenshot matching page</span></div>
+    <div class="cmd-row"><span class="sig">cdc nav &lt;pattern&gt; &lt;url&gt;</span><span class="desc">Navigate matching page to URL</span></div>
+    <div class="cmd-row"><span class="sig">cdc dev-mode [on|off|status]</span><span class="desc">Toggle/query extension developer mode</span></div>
+    <div class="cmd-row"><span class="sig">cdc ext-errors &lt;name&gt; [--clear]</span><span class="desc">Read/clear extension errors</span></div>
+    <div class="cmd-row"><span class="sig">cdc layout &lt;pattern&gt; [mode]</span><span class="desc">Page layout: actionable (default) or tree</span></div>
+  </div>
+
+  <h3>Interaction Commands</h3>
+  <div class="cmd-grid">
+    <div class="cmd-row"><span class="sig">cdc fill &lt;pattern&gt; &lt;target&gt; &lt;val&gt;</span><span class="desc">Auto-detect + fill a form field</span></div>
+    <div class="cmd-row"><span class="sig">cdc fill-many &lt;pattern&gt; &lt;json&gt;</span><span class="desc">Fill multiple fields (one connection)</span></div>
+    <div class="cmd-row"><span class="sig">cdc clear &lt;pattern&gt; &lt;target&gt;</span><span class="desc">Clear a field's value</span></div>
+    <div class="cmd-row"><span class="sig">cdc click &lt;pattern&gt; &lt;target&gt;</span><span class="desc">Click element (real mouse events)</span></div>
+    <div class="cmd-row"><span class="sig">cdc check &lt;pattern&gt; &lt;target&gt; [on]</span><span class="desc">Toggle checkbox on/off</span></div>
+    <div class="cmd-row"><span class="sig">cdc verify &lt;pattern&gt; &lt;target&gt; [val]</span><span class="desc">Check field value</span></div>
+    <div class="cmd-row"><span class="sig">cdc type &lt;pattern&gt; &lt;target&gt; &lt;text&gt;</span><span class="desc">Keyboard simulation (char-by-char)</span></div>
+    <div class="cmd-row"><span class="sig">cdc options &lt;pattern&gt; &lt;target&gt;</span><span class="desc">List dropdown/combobox choices</span></div>
+    <div class="cmd-row"><span class="sig">cdc hover &lt;pattern&gt; &lt;target&gt;</span><span class="desc">Hover over an element</span></div>
+  </div>
+
+  <h3>Flags</h3>
+  <div class="cmd-grid">
+    <div class="cmd-row"><span class="sig">--wait &lt;ms&gt;</span><span class="desc">Wait for element to appear before acting (fill, click)</span></div>
+  </div>
+</section>
+
+<!-- ── Layout Modes ────────────────────────── -->
+<section id="layout-modes">
+  <h2>Layout Modes</h2>
+  <p>
+    <code>cdc layout</code> extracts page structure without a vision model — it uses
+    the browser's accessibility tree. Two modes serve different workflows:
+  </p>
+
+  <div class="compare">
+    <div class="compare-col">
+      <h4>Actionable (default)</h4>
+      <p style="font-size:.85rem;color:var(--g500);margin-top:.3rem;">
+        Numbered interactive elements as a markdown table. AI agents reference elements
+        by number: <em>"fill element 5"</em>. Fast, compact, directly actionable.
+      </p>
+      <pre># Page Title
+URL: https://example.com
+
+## Actionable Elements
+
+| # | Type     | Label     | Value | Position |
+|---|----------|-----------|-------|----------|
+| 1 | textbox  | First     |       | 10,50    |
+| 2 | textbox  | Last      |       | 10,90    |
+| 3 | button   | Submit    |       | 10,130   |
+| 4 | combobox | Country   | US    | 10,170   |
+| 5 | checkbox | Agree     |       | 10,210   |
+
+## Headings
+- [H1] Registration Form
+
+## Content (6 blocks)
+Welcome | Please fill out the form</pre>
+    </div>
+    <div class="compare-col">
+      <h4>Tree</h4>
+      <p style="font-size:.85rem;color:var(--g500);margin-top:.3rem;">
+        Full accessibility tree with roles, names, values, and hierarchy. Best
+        for debugging and understanding complex widget structures. Supports
+        depth limit: <code>cdc layout &lt;pattern&gt; tree 6</code>.
+      </p>
+      <pre>Page: Page Title
+URL:  https://example.com
+AX nodes: 342 (depth ≤ 4)
+
+[RootWebArea] "Page Title"
+  [heading] "Registration Form"
+  [textbox] "First Name"
+  [textbox] "Last Name"
+    [StaticText] "Optional"
+  [button] "Submit"
+  [combobox] "Country" value="US"
+    [option] "United States"
+    [option] "Canada"
+  [checkbox] "Agree to terms"
+
+Summary: textbox:4, button:2, link:8, heading:1,
+         image:3, combobox:1, checkbox:1</pre>
+    </div>
+  </div>
+
+  <div class="info-box">
+    <strong>Usage tip:</strong> Use <strong>actionable</strong> mode for AI agent
+    interactions (numbers map to <code>fill</code>, <code>click</code>, etc.).
+    Use <strong>tree</strong> mode when debugging widget structure or exploring
+    complex shadow DOM UIs.
+  </div>
+</section>
+
+<!-- ── Fill Engine ─────────────────────────── -->
+<section id="fill-engine">
+  <h2>Fill Engine</h2>
+  <p>
+    The <code>fill</code> command uses an intelligent auto-detection engine that adapts
+    to each element type. It resolves targets by <strong>index number</strong> (from layout)
+    or <strong>CSS selector</strong>, then applies the optimal strategy.
+  </p>
+
+  <h3>Element Type Detection</h3>
+  <p>The engine classifies every element before filling:</p>
+  <ul>
+    <li><strong>Text inputs</strong> — <code>&lt;input&gt;</code>, <code>&lt;textarea&gt;</code> → paste strategy with char-by-char fallback</li>
+    <li><strong>Select dropdowns</strong> — <code>&lt;select&gt;</code> → three-phase matching (exact → startsWith → includes)</li>
+    <li><strong>Checkboxes / Radios</strong> — toggles <code>checked</code> state automatically</li>
+    <li><strong>File inputs</strong> — detected and rejected (unsupported)</li>
+  </ul>
+
+  <h3>Fill Strategies</h3>
+  <p>For text inputs, the engine tries two strategies in order:</p>
+
+  <div class="compare">
+    <div class="compare-col">
+      <h4>Paste (primary)</h4>
+      <pre style="font-size:.75rem;">1. el.focus()
+2. el.value = ''
+3. el.value = value
+4. dispatch InputEvent with
+   inputType='insertFromPaste'
+5. dispatch 'change' event
+6. el.blur()
+7. Verify el.value === value
+   → strategy: 'paste'</pre>
+    </div>
+    <div class="compare-col">
+      <h4>Char-by-char (fallback)</h4>
+      <pre style="font-size:.75rem;">1. el.focus()
+2. el.value = ''
+3. for each character:
+   el.value = substring
+   dispatch 'input' event
+4. dispatch 'change' event
+5. el.blur()
+6. Verify el.value === value
+   → strategy: 'char-by-char'</pre>
+    </div>
+  </div>
+
+  <h3>Structured Results</h3>
+  <p>Every fill operation returns a structured JSON result with all the information you need:</p>
+  <pre>{
+  <span class="kw">"ok"</span>:      <span class="kc">true</span>,
+  <span class="kw">"actual"</span>:  <span class="str">"Bhalla"</span>,
+  <span class="kw">"strategy"</span>: <span class="str">"paste"</span>,
+  <span class="kw">"error"</span>:   <span class="kc">null</span>,
+  <span class="kw">"message"</span>: <span class="str">"OK"</span>,
+  <span class="kw">"duration"</span>: <span class="num">12</span>
+}</pre>
+
+  <h3>Select Matching (3 Phases)</h3>
+  <p>When a <code>&lt;select&gt;</code> element is detected, the engine uses a three-phase matching algorithm:</p>
+  <div class="feature-grid">
+    <div class="feature-card">
+      <span class="icon">🎯</span>
+      <h4>Phase 1 — Exact</h4>
+      <p>Case-insensitive exact match on option text or value</p>
+    </div>
+    <div class="feature-card">
+      <span class="icon">🔤</span>
+      <h4>Phase 2 — startsWith</h4>
+      <p>Option text or value starts with the input</p>
+    </div>
+    <div class="feature-card">
+      <span class="icon">🔍</span>
+      <h4>Phase 3 — includes</h4>
+      <p>Option text or value contains the input (broadest match)</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Interaction Commands ────────────────── -->
+<section id="interaction">
+  <h2>Interaction Commands</h2>
+  <p>
+    All interaction commands accept a <strong>target</strong> which can be either a
+    numbered index (from <code>cdc layout</code>) or a CSS selector. Every result
+    includes <code>duration</code> in milliseconds.
+  </p>
+
+  <div class="tab-bar" id="interactTabs">
+    <button class="tab-btn active" data-tab="fill">fill</button>
+    <button class="tab-btn" data-tab="fill-many">fill-many</button>
+    <button class="tab-btn" data-tab="click">click</button>
+    <button class="tab-btn" data-tab="clear">clear</button>
+    <button class="tab-btn" data-tab="check">check</button>
+    <button class="tab-btn" data-tab="verify">verify</button>
+    <button class="tab-btn" data-tab="type">type</button>
+    <button class="tab-btn" data-tab="options">options</button>
+    <button class="tab-btn" data-tab="hover">hover</button>
+  </div>
+  <div class="tab-content" id="interactContent">
+    <div class="tab-pane active" id="tab-fill">
+      <pre><span class="cmt"># Fill by index (from layout output)</span>
+cdc fill oraclecloud 5 "Bhalla"
+
+<span class="cmt"># Fill by CSS selector</span>
+cdc fill oraclecloud "#lastName" "Bhalla"
+
+<span class="cmt"># With wait for async-loaded elements</span>
+cdc fill oraclecloud 5 "Bhalla" --wait 5000</pre>
+    </div>
+    <div class="tab-pane" id="tab-fill-many">
+      <pre><span class="cmt"># Fill multiple fields in a single CDP connection (4× faster)</span>
+cdc fill-many oraclecloud '{"5":"Bhalla","7":"Shivam","15":"Kumar"}'
+
+<span class="cmt"># From a JSON file</span>
+cdc fill-many oraclecloud fields.json</pre>
+    </div>
+    <div class="tab-pane" id="tab-click">
+      <pre><span class="cmt"># Click by index (uses real mouse events)</span>
+cdc click oraclecloud 8
+
+<span class="cmt"># Click by CSS selector</span>
+cdc click oraclecloud "#submitBtn"</pre>
+    </div>
+    <div class="tab-pane" id="tab-clear">
+      <pre><span class="cmt"># Clear a field</span>
+cdc clear oraclecloud 5</pre>
+    </div>
+    <div class="tab-pane" id="tab-check">
+      <pre><span class="cmt"># Toggle checkbox (no argument = toggle)</span>
+cdc check oraclecloud 12
+
+<span class="cmt"># Explicitly check or uncheck</span>
+cdc check oraclecloud 12 on
+cdc check oraclecloud 12 off</pre>
+    </div>
+    <div class="tab-pane" id="tab-verify">
+      <pre><span class="cmt"># Check field value (without expected = just read)</span>
+cdc verify oraclecloud 5
+
+<span class="cmt"># Verify expected value (case-insensitive)</span>
+cdc verify oraclecloud 5 "Bhalla"</pre>
+    </div>
+    <div class="tab-pane" id="tab-type">
+      <pre><span class="cmt"># Type text character by character (full keyboard events)</span>
+cdc type oraclecloud 5 "Hello World"</pre>
+    </div>
+    <div class="tab-pane" id="tab-options">
+      <pre><span class="cmt"># List dropdown/combobox options</span>
+cdc options oraclecloud 4
+
+<span class="cmt"># Returns structured result with all available choices</span>
+<span class="cmt"># Works with native &lt;select&gt; and custom comboboxes</span></pre>
+    </div>
+    <div class="tab-pane" id="tab-hover">
+      <pre><span class="cmt"># Hover over an element (triggers hover-dependent UIs)</span>
+cdc hover oraclecloud 3</pre>
+    </div>
+  </div>
+</section>
+
+<!-- ── The --wait Flag ─────────────────────── -->
+<section id="wait-flag">
+  <h2>The <code>--wait</code> Flag</h2>
+  <p>
+    Some elements don't exist in the DOM immediately — they appear after async
+    operations, API calls, or transitions. The <code>--wait</code> flag tells cdc
+    to poll for the element before acting.
+  </p>
+
+  <pre><span class="cmt"># Wait up to 5 seconds for element to appear, then fill</span>
+cdc fill oraclecloud 5 "Bhalla" --wait 5000
+
+<span class="cmt"># Wait up to 3 seconds for a dynamically loaded button</span>
+cdc click oraclecloud 8 --wait 3000</pre>
+
+  <div class="info-box">
+    <strong>How it works:</strong> cdc runs a busy-poll loop in-page (200ms
+    intervals) calling <code>resolveElement()</code> until the element is found
+    or the deadline expires. If the element never appears, the result includes
+    <code>element_not_found</code> with the wait time.
+  </div>
+</section>
+
+<!-- ── Duration Tracking ───────────────────── -->
+<section id="duration">
+  <h2>Duration Tracking</h2>
+  <p>
+    Every cdc command reports its execution time in milliseconds. This is
+    invaluable for <strong>performance debugging</strong> — you can identify
+    slow pages, heavy CDP calls, or network latency in your automation pipeline.
+  </p>
+
+  <pre><span class="cmt"># Every result includes duration</span>
+{
+  <span class="kw">"ok"</span>:       <span class="kc">true</span>,
+  <span class="kw">"actual"</span>:   <span class="str">"Bhalla"</span>,
+  <span class="kw">"strategy"</span>: <span class="str">"paste"</span>,
+  <span class="kw">"duration"</span>: <span class="num">47</span>
+}
+
+<span class="cmt"># fill-many includes per-field + total durations</span>
+{
+  <span class="kw">"ok"</span>:     <span class="kc">true</span>,
+  <span class="kw">"filled"</span>: <span class="num">3</span>,
+  <span class="kw">"failed"</span>: <span class="num">0</span>,
+  <span class="kw">"total"</span>:  <span class="num">3</span>,
+  <span class="kw">"duration"</span>: <span class="num">156</span>,
+  <span class="kw">"results"</span>: [
+    { <span class="kw">"target"</span>: <span class="str">"5"</span>, <span class="kw">"ok"</span>: <span class="kc">true</span>, <span class="kw">"duration"</span>: <span class="num">12</span> },
+    { <span class="kw">"target"</span>: <span class="str">"7"</span>, <span class="kw">"ok"</span>: <span class="kc">true</span>, <span class="kw">"duration"</span>: <span class="num">8</span> },
+    { <span class="kw">"target"</span>: <span class="str">"15"</span>, <span class="kw">"ok"</span>: <span class="kc">true</span>, <span class="kw">"duration"</span>: <span class="num">11</span> }
+  ]
+}</pre>
+
+  <p>Typical durations (Chrome devtools on localhost):</p>
+  <div class="dur-vis">
+    <span style="font-family:var(--mono);font-size:.8rem;min-width:120px;">fill (paste)</span>
+    <div class="dur-bar"><div class="dur-bar-fill" style="width:8%;"></div></div>
+    <span style="font-family:var(--mono);font-size:.75rem;color:var(--g500);">10–50ms</span>
+  </div>
+  <div class="dur-vis">
+    <span style="font-family:var(--mono);font-size:.8rem;min-width:120px;">fill-many (3 fields)</span>
+    <div class="dur-bar"><div class="dur-bar-fill" style="width:30%;"></div></div>
+    <span style="font-family:var(--mono);font-size:.75rem;color:var(--g500);">~150ms</span>
+  </div>
+  <div class="dur-vis">
+    <span style="font-family:var(--mono);font-size:.8rem;min-width:120px;">layout (actionable)</span>
+    <div class="dur-bar"><div class="dur-bar-fill" style="width:20%;"></div></div>
+    <span style="font-family:var(--mono);font-size:.75rem;color:var(--g500);">30–100ms</span>
+  </div>
+  <div class="dur-vis">
+    <span style="font-family:var(--mono);font-size:.8rem;min-width:120px;">screenshot</span>
+    <div class="dur-bar"><div class="dur-bar-fill" style="width:60%;"></div></div>
+    <span style="font-family:var(--mono);font-size:.75rem;color:var(--g500);">200–800ms</span>
+  </div>
+  <div class="dur-vis">
+    <span style="font-family:var(--mono);font-size:.8rem;min-width:120px;">reload-ext</span>
+    <div class="dur-bar"><div class="dur-bar-fill" style="width:50%;"></div></div>
+    <span style="font-family:var(--mono);font-size:.75rem;color:var(--g500);">100–500ms</span>
+  </div>
+</section>
+
+<!-- ── Architecture ─────────────────────────── -->
+<section id="architecture">
+  <h2>Architecture</h2>
+  <p>
+    cdc's architecture is designed for reliability and clean separation of concerns:
+  </p>
+
+  <div class="arch-flow">
+    <div class="arch-node">cdc CLI<br><span class="tag">bin/cdc.mjs</span></div>
+    <span class="arch-arrow">→</span>
+    <div class="arch-node">connect.mjs<br><span class="tag">Playwright CDP</span></div>
+    <span class="arch-arrow">→</span>
+    <div class="arch-node">circuit.mjs<br><span class="tag">Circuit Breaker</span></div>
+    <span class="arch-arrow">→</span>
+    <div class="arch-node">commands/*.mjs<br><span class="tag">One per command</span></div>
+    <span class="arch-arrow">→</span>
+    <div class="arch-node">page-scripts.js<br><span class="tag">Browser context</span></div>
+  </div>
+
+  <h3>Component Breakdown</h3>
+  <div class="feature-grid">
+    <div class="feature-card">
+      <span class="icon">🔌</span>
+      <h4>connect.mjs</h4>
+      <p>Wraps Playwright's <code>connectOverCDP()</code>. Provides <code>connect()</code> for tab listing and <code>findPage()</code> for URL-pattern matching.</p>
+    </div>
+    <div class="feature-card">
+      <span class="icon">⚡</span>
+      <h4>circuit.mjs</h4>
+      <p>Circuit breaker state machine: CLOSED → OPEN (2 failures) → HALF_OPEN (auto-test after 15s) → CLOSED. State persists in <code>/tmp/cdc-circuit.json</code>.</p>
+    </div>
+    <div class="feature-card">
+      <span class="icon">📋</span>
+      <h4>commands/*.mjs</h4>
+      <p>One file per command. Each receives <code>CDP_URL</code> and command-specific args, uses <code>findPage()</code> or <code>connect()</code>, and returns structured output.</p>
+    </div>
+    <div class="feature-card">
+      <span class="icon">🌐</span>
+      <h4>page-scripts.js</h4>
+      <p>Functions evaluated in the browser context via <code>page.evaluate()</code>. Handles element resolution, mouse events, text input, and dropdown inspection.</p>
+    </div>
+    <div class="feature-card">
+      <span class="icon">🧠</span>
+      <h4>interact.mjs</h4>
+      <p>Higher-order interaction engine. Loads <code>page-scripts.js</code>, builds resolve scripts (<code>waitResolveScript</code> for polling), executes in-page, returns structured results.</p>
+    </div>
+  </div>
+
+  <h3>Data Flow</h3>
+  <pre><span class="num">1</span>  bin/cdc.mjs  parses args, routes to command
+<span class="num">2</span>  Command calls findPage(cdpUrl, pattern)
+<span class="num">3</span>    connect.mjs → connectOverCDP → returns {browser, ctx, page}
+<span class="num">4</span>    circuit.mjs checks state (fail fast if OPEN)
+<span class="num">5</span>  Command executes via page.evaluate(page-scripts.js)
+<span class="num">6</span>    Element resolution: index ↔ CSS selector
+<span class="num">7</span>    Action: fill, click, hover, etc. (in browser context)
+<span class="num">8</span>  Structured result → stdout
+<span class="num">9</span>  browser.close() → CDP connection closed</pre>
+</section>
+
+<!-- ── How It Works ────────────────────────── -->
+<section id="how-it-works">
+  <h2>How It Works</h2>
+
+  <h3>Shadow DOM Drilling</h3>
+  <p>
+    Chrome extension pages use Shadow DOM heavily (e.g., <code>chrome://extensions</code>).
+    cdc navigates these by manually drilling through <code>shadowRoot</code> properties:
+  </p>
+  <pre>extensions-manager
+  └─ shadowRoot
+     └─ extensions-item-list
+        └─ shadowRoot
+           └─ extensions-item
+              └─ shadowRoot
+                 ├─ #name (text content)
+                 ├─ #extension-id (text content)
+                 └─ #dev-reload-button (click target)</pre>
+  <p>
+    This allows <code>reload-ext</code> and <code>ext-errors</code> to work
+    with any Chrome extension without any project-specific code.
+  </p>
+
+  <h3>Accessibility Tree</h3>
+  <p>
+    The <code>layout</code> command uses CDP's <code>Accessibility.getFullAXTree</code>
+    to extract the full accessibility tree. This gives a complete, structured view
+    of the page — including elements in shadow DOMs — without needing a vision model:
+  </p>
+  <pre><span class="cmt">// CDP call used by tree mode</span>
+<span class="kw">const</span> cdp = <span class="kw">await</span> ctx.newCDPSession(page);
+<span class="kw">const</span> { nodes } = <span class="kw">await</span> cdp.send(<span class="str">'Accessibility.getFullAXTree'</span>);
+renderTree(nodes, maxDepth);</pre>
+
+  <h3>Real Mouse Events</h3>
+  <p>
+    Unlike simple <code>.click()</code> calls, cdc's <code>click</code> and
+    <code>hover</code> commands dispatch a full sequence of DOM events that
+    mimic real user interaction:
+  </p>
+  <pre><span class="cmt">// Click sequence (real mouse events)</span>
+pointerdown → mousedown → pointerup → mouseup → click
+
+<span class="cmt">// Hover sequence</span>
+pointerover → mouseover → pointerenter → mouseenter →
+pointermove → mousemove</pre>
+  <p>
+    This ensures that JavaScript frameworks listening for specific event
+    types (e.g., React's <code>onClick</code> via <code>PointerEvent</code>)
+    respond correctly.
+  </p>
+
+  <h3>Element Resolution</h3>
+  <p>
+    Elements can be targeted by <strong>index number</strong> or
+    <strong>CSS selector</strong>:
+  </p>
+  <pre><span class="cmt">// Index-based resolution (from layout output)</span>
+<span class="kw">function</span> resolveElement(target) {
+  <span class="kw">const</span> isIndex = /^\d+$/.test(String(target));
+  <span class="kw">if</span> (isIndex) {
+    <span class="cmt">// Collect all interactive elements, sorted by Y then X</span>
+    <span class="cmt">// Filter out invisible/non-interactive elements</span>
+    <span class="kw">return</span> items[parseInt(target) - 1].el;
+  }
+  <span class="kw">return</span> document.querySelector(target);
+}</pre>
+</section>
+
+<footer>
+  <p>
+    chrome-cdp-cli &middot; Built with Chromium CDP &middot;
+    <a href="https://github.com/shivam2014/chrome-cdp-cli">GitHub</a> &middot;
+    Documentation powered by GitHub Pages
+  </p>
+</footer>
+
+</div> <span class="cmt">/* .container */</span>
+
+<script>
+// ── Dark mode toggle ──
+function toggleDarkMode() {
+  var html = document.documentElement;
+  var current = html.getAttribute('data-dm');
+  if (current === 'dark') {
+    html.setAttribute('data-dm', 'light');
+  } else if (current === 'light') {
+    html.removeAttribute('data-dm');
+  } else {
+    html.setAttribute('data-dm', 'dark');
+  }
+  updateToggleIcon();
+  try { localStorage.setItem('dm-pref', html.getAttribute('data-dm') || ''); } catch(e) {}
+}
+
+function updateToggleIcon() {
+  var dm = document.documentElement.getAttribute('data-dm');
+  var btn = document.getElementById('dmToggle');
+  if (dm === 'dark') btn.textContent = '\u2600\uFE0F';
+  else if (dm === 'light') btn.textContent = '\uD83C\uDF19';
+  else {
+    btn.textContent = window.matchMedia('(prefers-color-scheme: dark)').matches ? '\u2600\uFE0F' : '\uD83C\uDF19';
+  }
+}
+
+(function() {
+  try {
+    var pref = localStorage.getItem('dm-pref');
+    if (pref === 'dark') document.documentElement.setAttribute('data-dm', 'dark');
+    else if (pref === 'light') document.documentElement.setAttribute('data-dm', 'light');
+    updateToggleIcon();
+  } catch(e) {}
+})();
+
+// ── Interactive code tabs ──
+document.addEventListener('DOMContentLoaded', function() {
+  var tabBar = document.getElementById('interactTabs');
+  if (!tabBar) return;
+
+  tabBar.addEventListener('click', function(e) {
+    var btn = e.target.closest('.tab-btn');
+    if (!btn) return;
+
+    var tab = btn.getAttribute('data-tab');
+    tabBar.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+
+    var content = document.getElementById('interactContent');
+    content.querySelectorAll('.tab-pane').forEach(function(p) { p.classList.remove('active'); });
+    document.getElementById('tab-' + tab).classList.add('active');
+  });
+});
+
+// ── Scroll reveal animation ──
+document.addEventListener('DOMContentLoaded', function() {
+  var sections = document.querySelectorAll('section');
+  sections.forEach(function(s) { s.classList.add('reveal'); });
+
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, { threshold: 0.1 });
+
+  sections.forEach(function(s) { observer.observe(s); });
+});
+</script>
+
+</body>
+</html>
