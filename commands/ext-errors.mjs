@@ -41,6 +41,7 @@ async function findExtId(page, name) {
 
 /**
  * Read errors from the error detail page.
+ * Structure: .error-item (message) + cr-collapse (context, stack, code)
  */
 async function readErrors(page) {
   return page.evaluate(() => {
@@ -60,31 +61,39 @@ async function readErrors(page) {
     for (const item of items) {
       const message = item.querySelector('.error-message')?.textContent?.trim() || '';
 
-      // Context URL
-      const contextUrl = item.querySelector('.context-url')?.textContent?.trim() || '';
+      // Context URL — in cr-collapse sibling
+      const collapse = item.closest('.item-container')?.querySelector('cr-collapse') ||
+                       item.parentElement?.querySelector('cr-collapse');
+      const contextUrl = collapse?.querySelector('.context-url')?.textContent?.trim() || '';
 
-      // Stack trace
-      const stackLi = item.querySelector('.stack-trace-container li');
-      const stackFile = stackLi?.textContent?.trim() || '';
+      // Stack trace — multiple li elements in .stack-trace-container
+      const stackContainer = collapse?.querySelector('.stack-trace-container');
+      const stackItems = stackContainer?.querySelectorAll('li') || [];
+      const stackTrace = Array.from(stackItems).map(li => li.textContent?.trim()).filter(Boolean);
 
-      // Code snippet from extensions-code-section
-      const codeSection = item.querySelector('extensions-code-section');
+      // Code snippet from extensions-code-section (has shadow root)
+      const codeSection = collapse?.querySelector('extensions-code-section');
       let code = '';
+      let codeLocation = '';
       if (codeSection?.shadowRoot) {
         const pre = codeSection.shadowRoot.querySelector('pre, code');
         code = pre?.textContent?.trim() || '';
-        // Clean up: take only the relevant lines (around the error)
-        const lines = code.split('\n').filter(l => l.trim());
-        // Find the throw line and take ±3 lines
-        const throwIdx = lines.findIndex(l => l.includes('throw') || l.includes('Error'));
-        if (throwIdx >= 0) {
-          const start = Math.max(0, throwIdx - 2);
-          const end = Math.min(lines.length, throwIdx + 4);
-          code = lines.slice(start, end).join('\n');
-        }
+        // Extract file:line from the code section header if present
+        const header = codeSection.shadowRoot.querySelector('.code-location, .file-location');
+        codeLocation = header?.textContent?.trim() || '';
       }
 
-      errors.push({ message, contextUrl, stackFile, code });
+      // Also try to get file:line from the first stack trace item
+      const primaryLocation = stackTrace[0] || '';
+
+      errors.push({
+        message,
+        contextUrl,
+        stackTrace,
+        primaryLocation,
+        code,
+        codeLocation
+      });
     }
 
     return { count: errors.length, errors };
@@ -178,10 +187,19 @@ export async function extErrors(cdpUrl, extName, opts = {}) {
     for (let i = 0; i < result.errors.length; i++) {
       const e = result.errors[i];
       console.log(`--- Error ${i + 1} ---`);
-      console.log(e.message);
+      console.log(`Message: ${e.message}`);
+      if (e.primaryLocation) console.log(`Location: ${e.primaryLocation}`);
       if (e.contextUrl) console.log(`Context: ${e.contextUrl}`);
-      if (e.stackFile) console.log(`Stack: ${e.stackFile}`);
-      if (e.code) console.log(`Code:\n${e.code}`);
+      if (e.stackTrace.length > 1) {
+        console.log('Stack:');
+        for (const frame of e.stackTrace) {
+          console.log(`  ${frame}`);
+        }
+      }
+      if (e.code) {
+        console.log('Code:');
+        console.log(e.code);
+      }
       console.log('');
     }
 
