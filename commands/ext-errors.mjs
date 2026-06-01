@@ -128,10 +128,11 @@ async function clearErrors(page) {
  */
 export async function extErrors(cdpUrl, extName, opts = {}) {
   const { browser, ctx } = await connect(cdpUrl);
+  let listPage = null;
 
   try {
     // 1. Open extensions page and ensure dev mode is on
-    const listPage = await ctx.newPage();
+    listPage = await ctx.newPage();
     await listPage.goto('chrome://extensions', { waitUntil: 'domcontentloaded' });
     await listPage.waitForTimeout(2000);
 
@@ -145,7 +146,6 @@ export async function extErrors(cdpUrl, extName, opts = {}) {
     });
 
     if (!devModeOn) {
-      await listPage.close();
       throw new Error('Could not enable developer mode — toggle not found');
     }
 
@@ -155,7 +155,6 @@ export async function extErrors(cdpUrl, extName, opts = {}) {
     // 2. Find extension ID
     const extId = await findExtId(listPage, extName);
     if (!extId) {
-      await listPage.close();
       throw new Error(`Extension "${extName}" not found`);
     }
 
@@ -167,7 +166,6 @@ export async function extErrors(cdpUrl, extName, opts = {}) {
     const result = await readErrors(listPage);
 
     if (result.error) {
-      await listPage.close();
       // No error page = no errors (not an error condition)
       if (result.error.includes('no error page')) {
         console.log('No extension errors.');
@@ -178,7 +176,6 @@ export async function extErrors(cdpUrl, extName, opts = {}) {
 
     if (result.count === 0) {
       console.log('No extension errors.');
-      await listPage.close();
       return;
     }
 
@@ -212,9 +209,8 @@ export async function extErrors(cdpUrl, extName, opts = {}) {
         console.error(`Clear failed: ${cleared.reason}`);
       }
     }
-
-    await listPage.close();
   } finally {
+    if (listPage) await listPage.close().catch(() => {});
     browser.close().catch(() => {});
   }
 }
